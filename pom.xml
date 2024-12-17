@@ -3,7 +3,7 @@
 
   <groupId>org.jitsi</groupId>
   <artifactId>ice4j</artifactId>
-  <version>3.1-SNAPSHOT</version>
+  <version>3.2-SNAPSHOT</version>
 
   <name>ice4j</name>
   <description>A Java implementation of the ICE protocol</description>
@@ -355,21 +355,6 @@
             <artifactId>exec-maven-plugin</artifactId>
             <configuration>
                 <mainClass>test.Ice</mainClass>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-
-    <profile>
-      <id>run-pseudotcp</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>exec-maven-plugin</artifactId>
-            <configuration>
-                <mainClass>test.IcePseudoTcp</mainClass>
             </configuration>
           </plugin>
         </plugins>

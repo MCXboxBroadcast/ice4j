@@ -165,6 +165,12 @@ class ConnectivityCheckClient
      */
     public void startChecks(CheckList checkList)
     {
+        if (!checkList.shouldStartPaceMaker())
+        {
+            logger.debug("Checks for " + checkList.getName() + " already started");
+            return;
+        }
+        logger.debug("Start connectivity checks for " + checkList.getName());
         synchronized (paceMakers)
         {
             if (stopped)
@@ -344,6 +350,8 @@ class ConnectivityCheckClient
             {
                 logger.trace("checking pair " + candidatePair.toRedactedString() + " tid " + tran);
             }
+
+            return tran;
         }
         catch (NetAccessManager.SocketNotFoundException e)
         {
@@ -351,8 +359,6 @@ class ConnectivityCheckClient
         }
         catch (Exception ex)
         {
-            tran = null;
-
             IceSocketWrapper stunSocket = localCandidate.getStunSocket(null);
 
             if (stunSocket != null)
@@ -376,7 +382,7 @@ class ConnectivityCheckClient
             }
         }
 
-        return tran;
+        return null;
     }
 
     /**
@@ -896,6 +902,13 @@ class ConnectivityCheckClient
         private final CheckList checkList;
 
         /**
+         * Whether this is the first time this {@link PaceMaker} has been run.
+         * We want to run the initial check for a checklist as soon as connectivity
+         * checking is started, with no delay.
+         */
+        private boolean firstRun = true;
+
+        /**
          * Creates a new {@link PaceMaker} for this
          * <tt>ConnectivityCheckClient</tt>.
          *
@@ -918,10 +931,18 @@ class ConnectivityCheckClient
         {
             CandidatePair pairToCheck = checkList.popTriggeredCheck();
 
+            if (pairToCheck != null)
+            {
+                logger.trace("Starting triggered check " + pairToCheck.toRedactedString());
+            }
             //if there are no triggered checks, go for an ordinary one.
             if (pairToCheck == null)
             {
                 pairToCheck = checkList.getNextOrdinaryPairToCheck();
+                if (pairToCheck != null)
+                {
+                    logger.trace("Starting ordinary check " + pairToCheck.toRedactedString());
+                }
             }
 
             if (pairToCheck != null)
@@ -950,6 +971,10 @@ class ConnectivityCheckClient
                         pairToCheck.setStateInProgress(transactionID);
                     }
                 }
+                if (pairToCheck.getState() == CandidatePairState.FAILED)
+                {
+                    updateCheckListAndTimerStates(pairToCheck);
+                }
             }
             else
             {
@@ -972,6 +997,13 @@ class ConnectivityCheckClient
          */
         protected Duration getDelayUntilNextRun()
         {
+            if (firstRun)
+            {
+                /* Run first check immediately. */
+                firstRun = false;
+                return Duration.ZERO;
+            }
+
             int activeCheckLists = parentAgent.getActiveCheckListCount();
 
             if (activeCheckLists < 1)
@@ -1002,6 +1034,12 @@ class ConnectivityCheckClient
                 }
                 paceMaker.cancel();
             }
+        }
+    }
+
+    public boolean isStopped() {
+        synchronized (paceMakers) {
+            return stopped;
         }
     }
 }
