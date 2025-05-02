@@ -961,6 +961,85 @@ public class StunCandidateHarvest
                         completedResolvingCandidate = true;
                     }
                 }
+                else if ((errorCodeAttr != null)
+                    && (errorCodeAttr.getErrorClass() == 3))
+                {
+                    // Got try alternate, so process it
+
+                    AlternateServerAttribute alternateServerAttr = (AlternateServerAttribute)
+                        response.getAttribute(Attribute.ALTERNATE_SERVER);
+
+                    RealmAttribute realm = (RealmAttribute)
+                        response.getAttribute(Attribute.REALM);
+
+                    NonceAttribute nonce = (NonceAttribute)
+                        response.getAttribute(Attribute.NONCE);
+
+                    logger.debug("Got alternate server, switching: " + alternateServerAttr.getAddress());
+
+                    // Update the harvester with the alternate server
+                    harvester.stunServer = alternateServerAttr.getAddress();
+
+                    // Create a new request to retry
+                    Request retryRequest = createRequestToRetry(request);
+                    TransactionID retryRequestTransactionID = null;
+
+                    // Sort out the transaction ID for the retry request
+                    if (transactionID != null)
+                    {
+                        Object applicationData
+                            = transactionID.getApplicationData();
+
+                        if (applicationData != null)
+                        {
+                            byte[] retryRequestTransactionIDAsBytes
+                                = retryRequest.getTransactionID();
+
+                            retryRequestTransactionID
+                                = (retryRequestTransactionIDAsBytes == null)
+                                ? TransactionID.createNewTransactionID()
+                                : TransactionID.createTransactionID(
+                                harvester.getStunStack(),
+                                retryRequestTransactionIDAsBytes);
+                            retryRequestTransactionID.setApplicationData(
+                                applicationData);
+                        }
+                    }
+
+                    try
+                    {
+                        // Setup the long-term credential session if needed
+                        if (longTermCredentialSession == null)
+                        {
+                            LongTermCredential longTermCredential
+                                = harvester.createLongTermCredential(this, realm.getRealm());
+
+                            if (longTermCredential != null)
+                            {
+                                longTermCredentialSession
+                                    = new LongTermCredentialSession(
+                                    longTermCredential,
+                                    realm.getRealm());
+
+                                harvester
+                                    .getStunStack()
+                                    .getCredentialsManager()
+                                    .registerAuthority(longTermCredentialSession);
+                            }
+                        }
+
+                        // Update the nonce
+                        longTermCredentialSession.setNonce(nonce.getNonce());
+
+                        // Send the retry request
+                        retryRequestTransactionID = sendRequest(retryRequest, false, retryRequestTransactionID);
+                        completedResolvingCandidate = (retryRequestTransactionID != null);
+                    }
+                    catch (StunException sex)
+                    {
+                        completedResolvingCandidate = true;
+                    }
+                }
                 if (completedResolvingCandidate
                         && processErrorOrFailure(
                                 response,

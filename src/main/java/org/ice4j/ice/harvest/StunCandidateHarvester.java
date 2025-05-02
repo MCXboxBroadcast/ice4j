@@ -63,7 +63,7 @@ public class StunCandidateHarvester
     /**
      * The address of the STUN server that we will be sending our requests to.
      */
-    public final TransportAddress stunServer;
+    public TransportAddress stunServer;
 
     /**
      * The <tt>StunStack</tt> used by this instance for the purposes of STUN
